@@ -8,6 +8,7 @@ from subprocess import Popen
 import json
 from pprint import pprint
 import sys
+import numpy
 
 #--------------------------------------------------------------------------------------#
 # Constants
@@ -64,6 +65,9 @@ for i in range(0, len(id_list)):
         
         
 cur_id = 1
+
+point_time = [];
+stroke_time = [];
         
 # Segment each trial
 for i in range(0, len(trial_data)):
@@ -72,12 +76,15 @@ for i in range(0, len(trial_data)):
     if cur_id < trial_data[i]["participant"]:
         cur_id += 1
         
-    # Decide where we will be saving these results
+    # Decide where we will be saving these results and get the elapsed time as well
+    this_time = trial_data[i]["interactions"]["elapsed"] / 1000.0;
     cur_par_dir = PARTICIPANT_DIR + "%s" % cur_id
     if trial_data[i]["input_method"] == POINT_INPUT:
         cur_path = os.path.join(cur_par_dir, "point")
+        point_time.append(this_time);
     else:
-        cur_path = os.path.join(cur_par_dir, "stroke")  
+        cur_path = os.path.join(cur_par_dir, "stroke")
+        stroke_time.append(this_time);
     
     # Load the original image
     cur_img = os.path.basename(trial_data[i]["interactions"]["filename"])
@@ -110,7 +117,7 @@ for i in range(0, len(trial_data)):
     
     # Execute the external segmentation algorithm.
     executable = os.path.join(CUR_DIR, 'boykovmaxflowgeneric')
-    p = Popen([executable, '--verbose', '--status',  '--minregionsize=500', '--outputdir={0}'.format(cur_path), '--strokefglabel={0}'.format(FG_GREYSCALE_INT), '--strokebglabel={0}'.format(BG_GREYSCALE_INT), cur_img_path, gsfile])
+    p = Popen([executable,'--minregionsize=500', '--outputdir={0}'.format(cur_path), '--strokefglabel={0}'.format(FG_GREYSCALE_INT), '--strokebglabel={0}'.format(BG_GREYSCALE_INT), cur_img_path, gsfile])
     p.wait()
     
     # Make .png copies of the .tif output images
@@ -118,3 +125,7 @@ for i in range(0, len(trial_data)):
     im = Image.open(resultimage)
     resultimage = os.path.join(cur_path, cur_img + '.segmentation.png')
     io.imsave(resultimage, im)
+    
+    
+print "Average point time: %0.3f  Std. Dev.: %0.3f\n" % (numpy.mean(point_time), numpy.std(point_time))
+print "Average stroke time: %0.3f  Std. Dev.: %0.3f\n" % (numpy.mean(stroke_time), numpy.std(stroke_time))
